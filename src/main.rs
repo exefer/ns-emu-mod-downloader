@@ -2,9 +2,12 @@ mod curl_helper;
 mod entities;
 mod mod_downloader;
 mod utils;
+
 use mod_downloader::ModDownloader;
 use std::{
     collections::{HashMap, HashSet},
+    error::Error,
+    fmt,
     io::{self, Write},
     sync::OnceLock,
 };
@@ -12,22 +15,22 @@ use std::{
 // TODO: Create a config struct
 pub(crate) static EMU_NAME: OnceLock<String> = OnceLock::new();
 
-fn get_input(prompt: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn get_input(prompt: &str) -> Result<String, Box<dyn Error>> {
     print!("{}", prompt);
     io::stdout().flush()?;
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
-    Ok(input.trim().to_string())
+    Ok(input.trim().to_owned())
 }
 
-fn display_options<T: std::fmt::Display>(title: &str, items: &[T]) {
+fn display_options<T: fmt::Display>(title: &str, items: &[T]) {
     println!("{}:", title);
-    for (index, item) in items.iter().enumerate() {
-        println!("  {}) {}", index + 1, item);
+    for (i, item) in items.iter().enumerate() {
+        println!("  {}) {}", i + 1, item);
     }
 }
 
-fn get_emu() -> Result<String, Box<dyn std::error::Error>> {
+fn get_emu() -> Result<String, Box<dyn Error>> {
     let emus: &[&[u8]] = &[
         &[121, 117, 122, 117],
         &[115, 117, 121, 117],
@@ -36,44 +39,41 @@ fn get_emu() -> Result<String, Box<dyn std::error::Error>> {
         &[116, 111, 114, 122, 117],
         &[115, 117, 100, 97, 99, 104, 105],
     ];
+
     let emus: Vec<String> = emus
         .iter()
         .map(|slice| String::from_utf8(slice.to_vec()).unwrap())
         .collect();
 
     display_options("\nSelect an emulator to download mods for", &emus);
+
     let input = get_input(&format!("\nEnter your choice [1-{}]: ", emus.len()))?;
+    let choice = input.parse::<usize>().unwrap_or(0).saturating_sub(1);
 
-    let choice = input.parse::<usize>().unwrap_or(0);
-
-    if choice == 0 || choice > emus.len() {
-        return Err(format!(
-            "Invalid option '{}'. Please choose a value from 1 to {}.",
-            input,
+    let emu = emus.get(choice).ok_or_else(|| {
+        format!(
+            "Invalid option '{input}'. Please choose a value from 1 to {}.",
             emus.len()
         )
-        .into());
-    }
+    })?;
 
-    let emu = &emus[choice - 1][..];
-    let emu_data_dir = dirs::data_dir().unwrap().join(emu);
-    let emu_config_dir = dirs::config_dir().unwrap().join(emu);
+    let data_dir = dirs::data_dir().unwrap().join(emu);
+    let config_dir = dirs::config_dir().unwrap().join(emu);
 
-    if !emu_data_dir.exists() || !emu_config_dir.exists() {
+    if !data_dir.exists() || !config_dir.exists() {
         println!(
-            "\nPlease install {} first or verify it's properly configured.\nExpected directories:\n  Data: {}\n  Config: {}\n",
-            emu,
-            emu_data_dir.display(),
-            emu_config_dir.display()
+            "\nPlease install {emu} first or verify it's properly configured.\n\
+             Expected directories:\n  Data: {}\n  Config: {}\n",
+            data_dir.display(),
+            config_dir.display()
         );
-
-        return Err(format!("Emulator '{}' is not installed on this system.", emu,).into());
+        return Err(format!("Emulator '{emu}' is not installed on this system.").into());
     }
 
-    Ok(emu.into())
+    Ok(emu.clone())
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     println!("=== Mod Downloader ===");
 
     let emu = get_emu()?;
@@ -95,7 +95,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let input = get_input(&format!("\nEnter your choice [1-{}]: ", repos.keys().len()))?;
 
-    let repo = repos.get(input.as_str()).ok_or_else(|| {
+    let repo = *repos.get(input.as_str()).ok_or_else(|| {
         format!(
             "Invalid option '{}'. Please choose 1 to {}.",
             input,
@@ -103,7 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
     })?;
 
-    let mut downloader: ModDownloader = ModDownloader::new(repo.to_string());
+    let mut downloader = ModDownloader::new(repo.to_owned());
 
     let games = downloader.read_game_titles()?;
 
@@ -123,7 +123,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\nFound mods for the following games:");
-    for (index, game) in games.iter().enumerate() {
+
+    for (i, game) in games.iter().enumerate() {
         let mods = game
             .mod_download_entries
             .iter()
@@ -134,7 +135,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .map(|(first, _)| first)
             })
             .collect::<HashSet<&str>>();
-        println!("  {}) {}: {} mods", index + 1, game.title_name, mods.len());
+        println!("  {}) {}: {} mods", i + 1, game.title_name, mods.len());
     }
 
     let proceed = get_input("\nDo you want to proceed to the download [Y/n]: ")?;
@@ -142,7 +143,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Y" => {
             downloader
                 .download_mods(&games)
-                .map_err(|e| -> Box<dyn std::error::Error> { e })?;
+                .map_err(|e| -> Box<dyn Error> { e })?;
             println!("Operation successfull.");
         }
         _ => println!("Operation canceled."),

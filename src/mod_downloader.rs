@@ -7,9 +7,13 @@ use crate::{
 };
 use curl::easy::Easy;
 use rayon::prelude::*;
-use std::fs::{File, create_dir_all};
-use std::io::Write;
-use std::path::PathBuf;
+use std::{
+    error::Error,
+    ffi::OsString,
+    fs::{File, create_dir_all},
+    io::{self, Write},
+    path::PathBuf,
+};
 
 struct ModPathInfo {
     title_name: String,
@@ -34,72 +38,64 @@ impl ModDownloader {
         }
     }
 
-    fn get_git_tree(&mut self) -> Result<GitTree, Box<dyn std::error::Error>> {
+    fn get_git_tree(&mut self) -> Result<GitTree, Box<dyn Error>> {
         self.client.get(true)?;
-        self.client.useragent(env!("CARGO_PKG_NAME")).unwrap();
+        self.client.useragent(env!("CARGO_PKG_NAME"))?;
         self.client.url(&format!(
             "https://api.github.com/repos/{}/git/trees/master?recursive=1",
             self.repository
         ))?;
-        Ok(self.client.without_body().send_with_response::<GitTree>()?)
+        Ok(self.client.without_body().send_with_response()?)
     }
 
-    pub fn read_game_titles(&mut self) -> Result<Vec<Game>, Box<dyn std::error::Error>> {
+    pub fn read_game_titles(&mut self) -> Result<Vec<Game>, Box<dyn Error>> {
         let load_directory = self.get_load_directory_path()?;
-        let mod_dirs = self.get_mod_directories()?;
         let git_tree = self.get_git_tree()?;
 
-        let games: Vec<Game> = mod_dirs
+        let games = self
+            .get_mod_directories()?
             .iter()
             .filter_map(|mod_dir_name| {
                 let title_id = mod_dir_name.to_string_lossy();
-                let title_version = self.get_title_version(&title_id).unwrap();
+                let title_version = self.get_title_version(&title_id).ok()?;
                 let mut title_name = String::new();
 
-                let mod_download_entries: Vec<ModDownloadEntry> = git_tree
+                let mod_download_entries: Vec<_> = git_tree
                     .tree
                     .iter()
-                    .filter(|entry| {
-                        entry.type_field == "blob"
+                    .filter(|e| {
+                        e.type_field == "blob"
                             && MOD_SUB_DIRS
                                 .iter()
-                                .any(|s| entry.path.contains(&format!("/{}/", s)))
+                                .any(|s| e.path.contains(&format!("/{s}/")))
                     })
                     .filter_map(|entry| {
-                        let mod_path_info = self.parse_mod_path(&entry.path);
+                        let info = self.parse_mod_path(&entry.path)?;
 
-                        if &std::ffi::OsString::from(&mod_path_info.title_id) != mod_dir_name {
+                        if OsString::from(&info.title_id) != *mod_dir_name {
                             return None;
                         }
 
                         if title_name.is_empty() {
-                            title_name = mod_path_info.title_name.to_string();
+                            title_name = info.title_name;
                         }
 
-                        if title_version.as_deref() == Some(&mod_path_info.title_version)
-                            || mod_path_info.title_version == "x.x.x"
+                        let version_matches = title_version.as_deref() == Some(&info.title_version)
+                            || info.title_version == "x.x.x"
                             || (title_version.is_none()
-                                && MOD_BASE_VERSIONS
-                                    .contains(&mod_path_info.title_version.as_str()))
-                        {
-                            Some(ModDownloadEntry {
-                                download_url: format!(
-                                    "https://raw.githubusercontent.com/{}/refs/heads/master/{}",
-                                    self.repository, entry.path
-                                ),
-                                mod_relative_path: mod_path_info.relative_path,
-                            })
-                        } else {
-                            None
-                        }
+                                && MOD_BASE_VERSIONS.contains(&info.title_version.as_str()));
+
+                        version_matches.then(|| ModDownloadEntry {
+                            download_url: format!(
+                                "https://raw.githubusercontent.com/{}/refs/heads/master/{}",
+                                self.repository, entry.path
+                            ),
+                            mod_relative_path: info.relative_path,
+                        })
                     })
                     .collect();
 
-                if title_name.is_empty() {
-                    return None;
-                }
-
-                Some(Game {
+                (!title_name.is_empty()).then(|| Game {
                     title_name,
                     title_version,
                     mod_download_entries,
@@ -108,92 +104,90 @@ impl ModDownloader {
                 })
             })
             .collect();
+
         Ok(games)
     }
 
-    pub fn download_mods(
-        &self,
-        games: &Vec<Game>,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let download_jobs: Vec<(&str, PathBuf)> = games
+    pub fn download_mods(&self, games: &[Game]) -> Result<(), Box<dyn Error + Send + Sync>> {
+        games
             .iter()
             .flat_map(|game| {
                 game.mod_download_entries.iter().map(move |entry| {
-                    let downloaded_file_path =
-                        game.mod_data_location.join(&entry.mod_relative_path);
-                    (entry.download_url.as_ref(), downloaded_file_path)
+                    (
+                        &entry.download_url,
+                        game.mod_data_location.join(&entry.mod_relative_path),
+                    )
                 })
             })
-            .collect();
+            .collect::<Vec<_>>()
+            .par_iter()
+            .try_for_each(|(url, path)| {
+                create_dir_all(path.parent().unwrap())?;
 
-        download_jobs.par_iter().try_for_each(|(url, path)| {
-            create_dir_all(path.parent().unwrap())?;
-            let mut file = File::create(path)?;
+                let mut file = File::create(path)?;
+                let mut easy = Easy::new();
 
-            let mut easy = Easy::new();
-            easy.get(true)?;
-            easy.url(&url.replace(" ", "%20"))?;
+                easy.get(true)?;
+                easy.url(&url.replace(' ', "%20"))?;
 
-            let mut transfer = easy.transfer();
-            transfer.write_function(|data| {
-                file.write_all(data)
-                    .expect("Failed to write to file during download");
-                Ok(data.len())
-            })?;
-            transfer.perform()?;
+                let mut transfer = easy.transfer();
 
-            Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-        })?;
+                transfer.write_function(|data| {
+                    file.write_all(data)
+                        .expect("Failed to write during download");
+                    Ok(data.len())
+                })?;
 
-        Ok(())
+                transfer.perform()?;
+
+                Ok(())
+            })
     }
 
-    fn get_load_directory_path(&self) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    fn get_load_directory_path(&self) -> Result<PathBuf, Box<dyn Error>> {
         let emu = EMU_NAME.get().unwrap();
-        let mut config_file_path = dirs::config_dir().unwrap();
-        config_file_path.push(emu);
-        config_file_path.push("qt-config.ini");
+        let config_path = dirs::config_dir().unwrap().join(emu).join("qt-config.ini");
 
-        for line in read_lines(&config_file_path)? {
-            let line = line?;
-            if let Some(load_directory) = line.strip_prefix("load_directory=") {
-                return Ok(if load_directory.is_empty() {
-                    let mut path_buf = dirs::data_dir().unwrap();
-                    path_buf.push(emu);
-                    path_buf.push("nand");
-                    path_buf
+        for line in read_lines(&config_path)? {
+            if let Some(load_dir) = line?.strip_prefix("load_directory=") {
+                return Ok(if load_dir.is_empty() {
+                    dirs::data_dir().unwrap().join(emu).join("nand")
                 } else {
-                    load_directory.into()
+                    load_dir.into()
                 });
             }
         }
+
         Err("Could not find 'load_directory' in config file".into())
     }
 
-    fn get_title_version(&self, title_id: &str) -> std::io::Result<Option<String>> {
-        let mut pv_path = dirs::cache_dir().unwrap();
-        pv_path.push(EMU_NAME.get().unwrap());
-        pv_path.push("game_list");
-        pv_path.push(format!("{}.pv.txt", title_id));
+    fn get_title_version(&self, title_id: &str) -> io::Result<Option<String>> {
+        let emu = EMU_NAME.get().unwrap();
+        let pv_path = dirs::cache_dir()
+            .unwrap()
+            .join(emu)
+            .join("game_list")
+            .join(format!("{title_id}.pv.txt"));
 
         if !pv_path.exists() {
             return Ok(None);
         }
 
         for line in read_lines(pv_path)? {
-            let line = line?;
-            if line.starts_with("Update (") {
-                let from = line.find("(").map(|i| i + 1).unwrap();
-                let to = line.rfind(")").unwrap();
-                return Ok(Some(line[from..to].to_string()));
+            if let Some(version) = line?
+                .strip_prefix("Update (")
+                .and_then(|s| s.strip_suffix(')'))
+            {
+                return Ok(Some(version.to_owned()));
             }
         }
+
         Ok(None)
     }
 
-    fn get_mod_directories(&self) -> Result<Vec<std::ffi::OsString>, Box<dyn std::error::Error>> {
-        let load_directory = self.get_load_directory_path()?;
-        Ok(load_directory
+    fn get_mod_directories(&self) -> Result<Vec<OsString>, Box<dyn Error>> {
+        Ok(self
+            .get_load_directory_path()?
             .read_dir()?
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
@@ -201,14 +195,15 @@ impl ModDownloader {
             .collect())
     }
 
-    fn parse_mod_path(&self, path: &str) -> ModPathInfo {
-        let parts: Vec<&str> = path.splitn(5, "/").collect();
+    fn parse_mod_path(&self, path: &str) -> Option<ModPathInfo> {
+        let mut parts = path.splitn(5, '/');
+        parts.next()?;
 
-        ModPathInfo {
-            title_name: parts[1].to_string(),
-            title_id: parts[2].replace(['[', ']'], ""),
-            title_version: parts[3].to_string(),
-            relative_path: parts[4..].join("/"),
-        }
+        Some(ModPathInfo {
+            title_name: parts.next()?.to_owned(),
+            title_id: parts.next()?.replace(['[', ']'], ""),
+            title_version: parts.next()?.to_owned(),
+            relative_path: parts.next()?.to_owned(),
+        })
     }
 }
