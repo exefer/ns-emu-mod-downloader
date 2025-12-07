@@ -1,8 +1,10 @@
 use crate::{
     EMU_NAME,
     curl_helper::BodyExt,
-    entities::game::{Game, ModDownloadEntry},
-    entities::github::GitTree,
+    entities::{
+        game::{Game, ModDownloadEntry},
+        github::GitTree,
+    },
     utils::read_lines,
 };
 use curl::easy::Easy;
