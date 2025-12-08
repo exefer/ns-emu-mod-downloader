@@ -81,10 +81,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     EMU_NAME.set(emu).unwrap();
 
     let repos: HashMap<&str, &str> = [
-        ("1", "Bellerof/switch-pchtxt-mods"),
-        ("2", "Bellerof/Switch-Ultrawide-Mods"),
-        ("3", "Bellerof/ue4-emuswitch-60fps"),
-        ("4", "Bellerof/switch-port-mods"),
+        ("1", "exefer/switch-pchtxt-mods"),
+        ("2", "exefer/Switch-Ultrawide-Mods"),
+        ("3", "exefer/ue4-emuswitch-60fps"),
+        ("4", "exefer/switch-port-mods"),
     ]
     .into();
 
