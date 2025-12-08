@@ -30,7 +30,7 @@ pub struct ModDownloader {
 }
 
 const MOD_SUB_DIRS: &[&str] = &["exefs", "romfs", "cheats"];
-const MOD_BASE_VERSIONS: &[&str] = &["1.0", "1.0.0"];
+const MOD_BASE_VERSIONS: &[&str] = &["1.0", "1.0.0", "1.00"];
 
 impl ModDownloader {
     pub fn new(repository: String) -> Self {
