@@ -1,6 +1,6 @@
 [package]
 name = "ns-emu-mod-downloader"
-version = "0.1.6"
+version = "0.1.6-hotfix"
 edition = "2024"
 
 [dependencies]
