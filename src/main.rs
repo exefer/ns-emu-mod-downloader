@@ -5,7 +5,7 @@ mod utils;
 
 use mod_downloader::ModDownloader;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     error::Error,
     fmt,
     io::{self, Write},
@@ -73,6 +73,13 @@ fn get_emu() -> Result<String, Box<dyn Error>> {
     Ok(emu.clone())
 }
 
+const REPOS: &[&str] = &[
+    "exefer/switch-port-mods",
+    "exefer/switch-pchtxt-mods",
+    "exefer/Switch-Ultrawide-Mods",
+    "exefer/ue4-emuswitch-60fps",
+];
+
 fn main() -> Result<(), Box<dyn Error>> {
     println!("=== Mod Downloader ===");
 
@@ -80,26 +87,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     EMU_NAME.set(emu).unwrap();
 
-    let repos: HashMap<&str, &str> = [
-        ("1", "exefer/switch-pchtxt-mods"),
-        ("2", "exefer/Switch-Ultrawide-Mods"),
-        ("3", "exefer/ue4-emuswitch-60fps"),
-        ("4", "exefer/switch-port-mods"),
-    ]
-    .into();
+    display_options("\nSelect a repository to download mods from", REPOS);
 
-    display_options(
-        "\nSelect a repository to download mods from",
-        &repos.values().collect::<Vec<_>>(),
-    );
+    let input = get_input(&format!("\nEnter your choice [1-{}]: ", REPOS.len()))?;
+    let choice = input.parse::<usize>().unwrap_or(0).saturating_sub(1);
 
-    let input = get_input(&format!("\nEnter your choice [1-{}]: ", repos.keys().len()))?;
-
-    let repo = *repos.get(input.as_str()).ok_or_else(|| {
+    let repo = *REPOS.get(choice).ok_or_else(|| {
         format!(
             "Invalid option '{}'. Please choose 1 to {}.",
             input,
-            repos.keys().len()
+            REPOS.len()
         )
     })?;
 
