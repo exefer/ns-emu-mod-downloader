@@ -1,5 +1,5 @@
 use crate::{
-    CONFIG,
+    Config,
     curl_helper::BodyExt,
     entities::{
         game::{Game, ModDownloadEntry},
@@ -27,16 +27,18 @@ struct ModPathInfo {
 pub struct ModDownloader {
     client: Easy,
     repository: String,
+    config: Config,
 }
 
 const MOD_SUB_DIRS: &[&str] = &["exefs", "romfs", "cheats"];
 const MOD_BASE_VERSIONS: &[&str] = &["1.0", "1.0.0", "1.00"];
 
 impl ModDownloader {
-    pub fn new(repository: String) -> Self {
+    pub fn new(repository: String, config: Config) -> Self {
         Self {
-            repository,
             client: Easy::new(),
+            repository,
+            config,
         }
     }
 
@@ -147,13 +149,12 @@ impl ModDownloader {
     }
 
     fn get_load_directory_path(&self) -> Result<PathBuf, Box<dyn Error>> {
-        let config = CONFIG.get().unwrap();
-        let config_path = config.config_dir.join("qt-config.ini");
+        let config_path = self.config.config_dir.join("qt-config.ini");
 
         for line in read_lines(&config_path)? {
             if let Some(load_dir) = line?.strip_prefix("load_directory=") {
                 return Ok(if load_dir.is_empty() {
-                    config.data_dir.join("load")
+                    self.config.data_dir.join("load")
                 } else {
                     load_dir.into()
                 });
@@ -164,8 +165,8 @@ impl ModDownloader {
     }
 
     fn get_title_version(&self, title_id: &str) -> io::Result<Option<String>> {
-        let config = CONFIG.get().unwrap();
-        let pv_path = config
+        let pv_path = self
+            .config
             .cache_dir
             .join("game_list")
             .join(format!("{title_id}.pv.txt"));

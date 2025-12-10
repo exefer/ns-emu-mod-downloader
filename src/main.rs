@@ -11,7 +11,6 @@ use std::{
     fmt,
     io::{self, Write},
     path::PathBuf,
-    sync::OnceLock,
 };
 
 #[derive(Debug, Clone)]
@@ -20,8 +19,6 @@ pub struct Config {
     pub config_dir: PathBuf,
     pub data_dir: PathBuf,
 }
-
-pub static CONFIG: OnceLock<Config> = OnceLock::new();
 
 fn get_input(prompt: &str) -> Result<String, Box<dyn Error>> {
     print!("{}", prompt);
@@ -124,8 +121,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let config = build_config()?;
 
-    CONFIG.set(config).unwrap();
-
     display_options("\nSelect a repository to download mods from", REPOS);
 
     let input = get_input(&format!("\nEnter your choice [1-{}]: ", REPOS.len()))?;
@@ -139,7 +134,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
     })?;
 
-    let mut downloader = ModDownloader::new(repo.to_owned());
+    let mut downloader = ModDownloader::new(repo.to_owned(), config);
 
     let games = downloader.read_game_titles()?;
 
