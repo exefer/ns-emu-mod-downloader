@@ -1,5 +1,5 @@
 use crate::{
-    EMU_NAME,
+    CONFIG,
     curl_helper::BodyExt,
     entities::{
         game::{Game, ModDownloadEntry},
@@ -147,13 +147,13 @@ impl ModDownloader {
     }
 
     fn get_load_directory_path(&self) -> Result<PathBuf, Box<dyn Error>> {
-        let emu = EMU_NAME.get().unwrap();
-        let config_path = dirs::config_dir().unwrap().join(emu).join("qt-config.ini");
+        let config = CONFIG.get().unwrap();
+        let config_path = config.config_dir.join("qt-config.ini");
 
         for line in read_lines(&config_path)? {
             if let Some(load_dir) = line?.strip_prefix("load_directory=") {
                 return Ok(if load_dir.is_empty() {
-                    dirs::data_dir().unwrap().join(emu).join("nand")
+                    config.data_dir.join("load")
                 } else {
                     load_dir.into()
                 });
@@ -164,10 +164,9 @@ impl ModDownloader {
     }
 
     fn get_title_version(&self, title_id: &str) -> io::Result<Option<String>> {
-        let emu = EMU_NAME.get().unwrap();
-        let pv_path = dirs::cache_dir()
-            .unwrap()
-            .join(emu)
+        let config = CONFIG.get().unwrap();
+        let pv_path = config
+            .cache_dir
             .join("game_list")
             .join(format!("{title_id}.pv.txt"));
 

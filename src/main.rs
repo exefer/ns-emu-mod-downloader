@@ -6,14 +6,22 @@ mod utils;
 use mod_downloader::ModDownloader;
 use std::{
     collections::HashSet,
+    env,
     error::Error,
     fmt,
     io::{self, Write},
+    path::PathBuf,
     sync::OnceLock,
 };
 
-// TODO: Create a config struct
-pub(crate) static EMU_NAME: OnceLock<String> = OnceLock::new();
+#[derive(Debug, Clone)]
+pub struct Config {
+    pub cache_dir: PathBuf,
+    pub config_dir: PathBuf,
+    pub data_dir: PathBuf,
+}
+
+pub static CONFIG: OnceLock<Config> = OnceLock::new();
 
 fn get_input(prompt: &str) -> Result<String, Box<dyn Error>> {
     print!("{}", prompt);
@@ -30,17 +38,17 @@ fn display_options<T: fmt::Display>(title: &str, items: &[T]) {
     }
 }
 
-fn get_emu() -> Result<String, Box<dyn Error>> {
-    let emus: &[&[u8]] = &[
-        &[121, 117, 122, 117],
-        &[115, 117, 121, 117],
-        &[101, 100, 101, 110],
-        &[99, 105, 116, 114, 111, 110],
-        &[116, 111, 114, 122, 117],
-        &[115, 117, 100, 97, 99, 104, 105],
-    ];
+const EMUS: &[&[u8]] = &[
+    &[121, 117, 122, 117],
+    &[115, 117, 121, 117],
+    &[101, 100, 101, 110],
+    &[99, 105, 116, 114, 111, 110],
+    &[116, 111, 114, 122, 117],
+    &[115, 117, 100, 97, 99, 104, 105],
+];
 
-    let emus: Vec<String> = emus
+fn select_emulator() -> Result<String, Box<dyn Error>> {
+    let emus: Vec<String> = EMUS
         .iter()
         .map(|slice| String::from_utf8(slice.to_vec()).unwrap())
         .collect();
@@ -73,6 +81,37 @@ fn get_emu() -> Result<String, Box<dyn Error>> {
     Ok(emu.clone())
 }
 
+fn try_portable_config() -> Result<Option<Config>, Box<dyn Error>> {
+    let user_dir = env::current_exe()?
+        .parent()
+        .ok_or("Cannot get parent directory")?
+        .join("user");
+
+    if user_dir.exists() && user_dir.join("config").join("qt-config.ini").exists() {
+        return Ok(Some(Config {
+            cache_dir: user_dir.join("cache"),
+            config_dir: user_dir.join("config"),
+            data_dir: user_dir,
+        }));
+    }
+
+    Ok(None)
+}
+
+fn build_config() -> Result<Config, Box<dyn Error>> {
+    if let Some(portable_config) = try_portable_config()? {
+        return Ok(portable_config);
+    }
+
+    let emu = select_emulator()?;
+
+    Ok(Config {
+        config_dir: dirs::config_dir().unwrap().join(&emu),
+        data_dir: dirs::data_dir().unwrap().join(&emu),
+        cache_dir: dirs::cache_dir().unwrap().join(&emu),
+    })
+}
+
 const REPOS: &[&str] = &[
     "exefer/switch-port-mods",
     "exefer/switch-pchtxt-mods",
@@ -83,9 +122,9 @@ const REPOS: &[&str] = &[
 fn main() -> Result<(), Box<dyn Error>> {
     println!("=== Mod Downloader ===");
 
-    let emu = get_emu()?;
+    let config = build_config()?;
 
-    EMU_NAME.set(emu).unwrap();
+    CONFIG.set(config).unwrap();
 
     display_options("\nSelect a repository to download mods from", REPOS);
 
@@ -136,6 +175,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let proceed = get_input("\nDo you want to proceed to the download [Y/n]: ")?;
+
     match proceed.as_str() {
         "Y" => {
             downloader
