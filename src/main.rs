@@ -35,30 +35,18 @@ fn display_options<T: fmt::Display>(title: &str, items: &[T]) {
     }
 }
 
-const EMUS: &[&[u8]] = &[
-    &[121, 117, 122, 117],
-    &[115, 117, 121, 117],
-    &[101, 100, 101, 110],
-    &[99, 105, 116, 114, 111, 110],
-    &[116, 111, 114, 122, 117],
-    &[115, 117, 100, 97, 99, 104, 105],
-];
+const EMUS: &[&str] = &["yuzu", "suyu", "eden", "citron", "torzu", "sudachi"];
 
 fn select_emulator() -> Result<String, Box<dyn Error>> {
-    let emus: Vec<String> = EMUS
-        .iter()
-        .map(|slice| String::from_utf8(slice.to_vec()).unwrap())
-        .collect();
+    display_options("\nSelect an emulator to download mods for", EMUS);
 
-    display_options("\nSelect an emulator to download mods for", &emus);
-
-    let input = get_input(&format!("\nEnter your choice [1-{}]: ", emus.len()))?;
+    let input = get_input(&format!("\nEnter your choice [1-{}]: ", EMUS.len()))?;
     let choice = input.parse::<usize>().unwrap_or(0).saturating_sub(1);
 
-    let emu = emus.get(choice).ok_or_else(|| {
+    let emu = *EMUS.get(choice).ok_or_else(|| {
         format!(
             "Invalid option '{input}'. Please choose a value from 1 to {}.",
-            emus.len()
+            EMUS.len()
         )
     })?;
 
@@ -75,7 +63,7 @@ fn select_emulator() -> Result<String, Box<dyn Error>> {
         return Err(format!("Emulator '{emu}' is not installed on this system.").into());
     }
 
-    Ok(emu.clone())
+    Ok(emu.to_owned())
 }
 
 fn try_portable_config() -> Result<Option<Config>, Box<dyn Error>> {
