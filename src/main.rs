@@ -1,6 +1,7 @@
 mod curl_helper;
 mod entities;
 mod mod_downloader;
+mod paths;
 mod utils;
 
 use mod_downloader::ModDownloader;
@@ -50,8 +51,7 @@ fn select_emulator() -> Result<String, Box<dyn Error>> {
         )
     })?;
 
-    let data_dir = dirs::data_dir().unwrap().join(emu);
-    let config_dir = dirs::config_dir().unwrap().join(emu);
+    let (_, config_dir, data_dir) = paths::get_dirs(emu);
 
     if !data_dir.exists() || !config_dir.exists() {
         println!(
@@ -89,11 +89,12 @@ fn build_config() -> Result<Config, Box<dyn Error>> {
     }
 
     let emu = select_emulator()?;
+    let (cache_dir, config_dir, data_dir) = paths::get_dirs(&emu);
 
     Ok(Config {
-        config_dir: dirs::config_dir().unwrap().join(&emu),
-        data_dir: dirs::data_dir().unwrap().join(&emu),
-        cache_dir: dirs::cache_dir().unwrap().join(&emu),
+        cache_dir,
+        config_dir,
+        data_dir,
     })
 }
 
