@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
       - name: Checkout repository
@@ -28,12 +28,20 @@ jobs:
       - name: Build the project
         run: cargo build --release
 
+      - name: Rename binary (Linux)
+        if: runner.os == 'Linux'
+        run: mv target/release/ns-emu-mod-downloader target/release/ns-emu-mod-downloader-linux
+
+      - name: Rename binary (macOS)
+        if: runner.os == 'macOS'
+        run: mv target/release/ns-emu-mod-downloader target/release/ns-emu-mod-downloader-macos
+
       - name: Upload binary as artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ runner.os }}
           path: |
-            target/release/ns-emu-mod-downloader
+            target/release/ns-emu-mod-downloader-*
             target/release/ns-emu-mod-downloader.exe
           if-no-files-found: ignore
 
