@@ -21,7 +21,7 @@ pub struct Config {
     pub data_dir: PathBuf,
 }
 
-fn get_input(prompt: &str) -> Result<String, Box<dyn Error>> {
+fn ask(prompt: &str) -> Result<String, Box<dyn Error>> {
     print!("{}", prompt);
     io::stdout().flush()?;
     let mut input = String::new();
@@ -30,7 +30,7 @@ fn get_input(prompt: &str) -> Result<String, Box<dyn Error>> {
 }
 
 fn display_options<T: fmt::Display>(title: &str, items: &[T]) {
-    println!("{}:", title);
+    println!(":: {}:", title);
     for (i, item) in items.iter().enumerate() {
         println!("  {}) {}", i + 1, item);
     }
@@ -39,28 +39,24 @@ fn display_options<T: fmt::Display>(title: &str, items: &[T]) {
 const EMUS: &[&str] = &["yuzu", "suyu", "eden", "citron", "torzu", "sudachi"];
 
 fn select_emulator() -> Result<String, Box<dyn Error>> {
-    display_options("\nSelect an emulator to download mods for", EMUS);
+    println!();
+    display_options("Select emulator", EMUS);
 
-    let input = get_input(&format!("\nEnter your choice [1-{}]: ", EMUS.len()))?;
+    let input = ask("Enter a number (default=1): ")?;
     let choice = input.parse::<usize>().unwrap_or(0).saturating_sub(1);
 
-    let emu = *EMUS.get(choice).ok_or_else(|| {
-        format!(
-            "Invalid option '{input}'. Please choose a value from 1 to {}.",
-            EMUS.len()
-        )
-    })?;
+    let emu = *EMUS
+        .get(choice)
+        .ok_or_else(|| format!("Invalid option. Please choose 1-{}.", EMUS.len()))?;
 
     let (_, config_dir, data_dir) = paths::get_dirs(emu);
 
     if !data_dir.exists() || !config_dir.exists() {
-        println!(
-            "\nPlease install {emu} first or verify it's properly configured.\n\
-             Expected directories:\n  Data: {}\n  Config: {}\n",
-            data_dir.display(),
-            config_dir.display()
-        );
-        return Err(format!("Emulator '{emu}' is not installed on this system.").into());
+        eprintln!();
+        eprintln!("Expected directories:");
+        eprintln!("  Data: {}", data_dir.display());
+        eprintln!("  Config: {}", config_dir.display());
+        return Err(format!("{} is not installed.", emu).into());
     }
 
     Ok(emu.to_owned())
@@ -110,23 +106,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let config = build_config()?;
 
-    display_options("\nSelect a repository to download mods from", REPOS);
+    println!();
+    display_options("Select repository", REPOS);
 
-    let input = get_input(&format!("\nEnter your choice [1-{}]: ", REPOS.len()))?;
+    let input = ask("Enter a number (default=1): ")?;
     let choice = input.parse::<usize>().unwrap_or(0).saturating_sub(1);
 
-    let repo = *REPOS.get(choice).ok_or_else(|| {
-        format!(
-            "Invalid option '{}'. Please choose 1 to {}.",
-            input,
-            REPOS.len()
-        )
-    })?;
+    let repo = *REPOS
+        .get(choice)
+        .ok_or_else(|| format!("Invalid option. Please choose 1-{}.", REPOS.len()))?;
 
     let mut downloader = ModDownloader::new(repo.to_owned(), config);
 
     let games = downloader.read_game_titles()?;
 
+    println!();
     if games.is_empty() {
         println!("No mod installation folders found on this system.");
         return Ok(());
@@ -142,7 +136,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    println!("\nFound mods for the following games:");
+    println!("Found mods for the following games:");
 
     for (i, game) in games.iter().enumerate() {
         let mods = game
@@ -158,14 +152,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("  {}) {}: {} mods", i + 1, game.title_name, mods.len());
     }
 
-    let proceed = get_input("\nDo you want to proceed to the download [Y/n]: ")?;
+    println!();
+    let proceed = ask("Proceed with download? [Y/n]: ")?;
+    let proceed = proceed.to_lowercase();
 
     match proceed.as_str() {
-        "Y" => {
+        "y" | "yes" | "" => {
             downloader
                 .download_mods(&games)
                 .map_err(|e| -> Box<dyn Error> { e })?;
-            println!("Operation successfull.");
+            println!("Operation successful.");
         }
         _ => println!("Operation canceled."),
     }
