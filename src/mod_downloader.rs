@@ -71,7 +71,7 @@ impl ModDownloader {
                         e.type_field == "blob"
                             && MOD_SUB_DIRS
                                 .iter()
-                                .any(|s| e.path.contains(&format!("/{s}/")))
+                                .any(|s| e.path.contains(&format!("/{}/", s)))
                     })
                     .filter_map(|entry| {
                         let info = self.parse_mod_path(&entry.path)?;
@@ -169,7 +169,7 @@ impl ModDownloader {
             .config
             .cache_dir
             .join("game_list")
-            .join(format!("{title_id}.pv.txt"));
+            .join(format!("{}.pv.txt", title_id));
 
         if !pv_path.exists() {
             return Ok(None);
