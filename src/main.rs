@@ -47,7 +47,7 @@ fn select_emulator() -> Result<String, Box<dyn Error>> {
 
     let emu = *EMUS
         .get(choice)
-        .ok_or_else(|| format!("Invalid option. Please choose 1-{}.", EMUS.len()))?;
+        .ok_or_else(|| format!("invalid option, please choose 1-{}", EMUS.len()))?;
 
     let (_, config_dir, data_dir) = paths::get_dirs(emu);
 
@@ -56,7 +56,7 @@ fn select_emulator() -> Result<String, Box<dyn Error>> {
         eprintln!("Expected directories:");
         eprintln!("  Data: {}", data_dir.display());
         eprintln!("  Config: {}", config_dir.display());
-        return Err(format!("{} is not installed.", emu).into());
+        return Err(format!("{} is not installed", emu).into());
     }
 
     Ok(emu.to_owned())
@@ -65,7 +65,7 @@ fn select_emulator() -> Result<String, Box<dyn Error>> {
 fn try_portable_config() -> Result<Option<Config>, Box<dyn Error>> {
     let user_dir = env::current_exe()?
         .parent()
-        .ok_or("Cannot get parent directory")?
+        .ok_or("cannot get parent directory")?
         .join("user");
 
     if user_dir.exists() && user_dir.join("config").join("qt-config.ini").exists() {
@@ -114,7 +114,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let repo = *REPOS
         .get(choice)
-        .ok_or_else(|| format!("Invalid option. Please choose 1-{}.", REPOS.len()))?;
+        .ok_or_else(|| format!("invalid option, please choose 1-{}", REPOS.len()))?;
 
     let mut downloader = ModDownloader::new(repo.to_owned(), config);
 

@@ -161,7 +161,7 @@ impl ModDownloader {
             }
         }
 
-        Err("Could not find 'load_directory' in config file".into())
+        Err("could not find 'load_directory' in config file".into())
     }
 
     fn get_title_version(&self, title_id: &str) -> io::Result<Option<String>> {
