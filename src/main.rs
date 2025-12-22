@@ -14,7 +14,6 @@ use std::{
     path::PathBuf,
 };
 
-#[derive(Debug, Clone)]
 pub struct Config {
     pub cache_dir: PathBuf,
     pub config_dir: PathBuf,
