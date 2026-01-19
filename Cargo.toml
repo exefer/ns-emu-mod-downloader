@@ -2,6 +2,10 @@
 name = "ns-emu-mod-downloader"
 version = "0.2.1"
 edition = "2024"
+description = "A command-line tool for downloading mods for Switch emulators"
+repository = "https://github.com/exefer/ns-emu-mod-downloader"
+license = "GPL-3.0-or-later"
+publish = false
 
 [dependencies]
 anyhow = "1.0.100"
