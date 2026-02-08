@@ -1,21 +1,17 @@
-use crate::{
-    Config,
-    curl_helper::BodyExt,
-    entities::{
-        game::{Game, ModDownloadEntry},
-        github::GitTree,
-    },
-    utils::read_lines,
-};
+use std::error::Error;
+use std::ffi::OsString;
+use std::fs::{File, create_dir_all};
+use std::io::{self, Write};
+use std::path::PathBuf;
+
 use curl::easy::Easy;
 use rayon::prelude::*;
-use std::{
-    error::Error,
-    ffi::OsString,
-    fs::{File, create_dir_all},
-    io::{self, Write},
-    path::PathBuf,
-};
+
+use crate::Config;
+use crate::curl_helper::BodyExt;
+use crate::entities::game::{Game, ModDownloadEntry};
+use crate::entities::github::GitTree;
+use crate::utils::read_lines;
 
 struct ModPathInfo {
     title_name: String,

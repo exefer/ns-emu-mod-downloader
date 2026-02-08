@@ -1,5 +1,7 @@
 // Source: https://github.com/rust-lang/promote-release/blob/master/src/curl_helper.rs
 #![allow(dead_code)]
+use std::io::Read;
+
 use anyhow::Context;
 use curl::easy::Easy;
 
@@ -30,7 +32,6 @@ pub struct Request<'a, S> {
 
 impl<S: serde::Serialize> Request<'_, S> {
     pub fn send_with_response<T: serde::de::DeserializeOwned>(self) -> anyhow::Result<T> {
-        use std::io::Read;
         let mut response = Vec::new();
         let body = self.body.map(|body| serde_json::to_vec(&body).unwrap());
         {
@@ -52,7 +53,6 @@ impl<S: serde::Serialize> Request<'_, S> {
     }
 
     pub fn send(self) -> anyhow::Result<()> {
-        use std::io::Read;
         let body = self.body.map(|body| serde_json::to_vec(&body).unwrap());
         {
             let mut transfer = self.client.transfer();
@@ -64,7 +64,6 @@ impl<S: serde::Serialize> Request<'_, S> {
             }
             transfer.perform()?;
         }
-
         Ok(())
     }
 }

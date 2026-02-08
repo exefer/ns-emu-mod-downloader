@@ -4,15 +4,14 @@ mod mod_downloader;
 mod paths;
 mod utils;
 
+use std::collections::HashSet;
+use std::env;
+use std::error::Error;
+use std::fmt;
+use std::io::{self, Write};
+use std::path::PathBuf;
+
 use mod_downloader::ModDownloader;
-use std::{
-    collections::HashSet,
-    env,
-    error::Error,
-    fmt,
-    io::{self, Write},
-    path::PathBuf,
-};
 
 pub struct Config {
     pub cache_dir: PathBuf,
