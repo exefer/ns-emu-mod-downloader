@@ -3,9 +3,21 @@ use std::ffi::OsString;
 use std::fs::{File, create_dir_all};
 use std::io::{self, Write};
 use std::path::PathBuf;
+use std::time::Duration;
 
-use curl::easy::Easy;
-use rayon::prelude::*;
+use curl::easy::{Easy, Easy2, Handler, WriteError};
+use curl::multi::Multi;
+
+struct FileWriter(File);
+
+impl Handler for FileWriter {
+    fn write(&mut self, data: &[u8]) -> Result<usize, WriteError> {
+        self.0
+            .write_all(data)
+            .expect("Failed to write during download");
+        Ok(data.len())
+    }
+}
 
 use crate::Config;
 use crate::curl_helper::BodyExt;
@@ -39,7 +51,6 @@ impl ModDownloader {
     }
 
     fn get_git_tree(&mut self) -> Result<GitTree, Box<dyn Error>> {
-        self.client.get(true)?;
         self.client.useragent(env!("CARGO_PKG_NAME"))?;
         self.client.url(&format!(
             "https://api.github.com/repos/{}/git/trees/master?recursive=1",
@@ -109,7 +120,7 @@ impl ModDownloader {
     }
 
     pub fn download_mods(&self, games: &[Game]) -> Result<(), Box<dyn Error + Send + Sync>> {
-        games
+        let downloads: Vec<_> = games
             .iter()
             .flat_map(|game| {
                 game.mod_download_entries.iter().map(move |entry| {
@@ -119,29 +130,38 @@ impl ModDownloader {
                     )
                 })
             })
-            .collect::<Vec<_>>()
-            .par_iter()
-            .try_for_each(|(url, path)| {
-                create_dir_all(path.parent().unwrap())?;
+            .collect();
 
-                let mut file = File::create(path)?;
-                let mut easy = Easy::new();
+        let multi = Multi::new();
+        let mut handles = Vec::new();
 
-                easy.get(true)?;
-                easy.url(&url.replace(' ', "%20"))?;
+        for (url, path) in &downloads {
+            create_dir_all(path.parent().unwrap())?;
 
-                let mut transfer = easy.transfer();
+            let mut easy = Easy2::new(FileWriter(File::create(path)?));
+            easy.url(&url.replace(' ', "%20"))?;
 
-                transfer.write_function(|data| {
-                    file.write_all(data)
-                        .expect("Failed to write during download");
-                    Ok(data.len())
-                })?;
+            let handle = multi.add2(easy)?;
+            handles.push(handle);
+        }
 
-                transfer.perform()?;
+        while multi.perform()? > 0 {
+            multi.wait(&mut [], Duration::from_secs(1))?;
+        }
 
-                Ok(())
-            })
+        multi.messages(|msg| {
+            if let Some(result) = msg.result()
+                && let Err(e) = result
+            {
+                eprintln!("Transfer error: {}", e);
+            }
+        });
+
+        for handle in handles {
+            multi.remove2(handle)?;
+        }
+
+        Ok(())
     }
 
     fn get_load_directory_path(&self) -> Result<PathBuf, Box<dyn Error>> {
