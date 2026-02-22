@@ -11,7 +11,12 @@ pub fn get_dirs(emu: &str) -> (PathBuf, PathBuf, PathBuf) {
             home.join(".local").join("share").join(emu),
         )
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        let base = dirs::data_dir().unwrap().join(emu);
+        (base.join("cache"), base.join("config"), base)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         (
             dirs::cache_dir().unwrap().join(emu),
