@@ -8,6 +8,12 @@ use std::time::Duration;
 use curl::easy::{Easy, Easy2, Handler, WriteError};
 use curl::multi::Multi;
 
+use crate::Config;
+use crate::curl_helper::BodyExt;
+use crate::entities::game::{Game, ModDownloadEntry};
+use crate::entities::github::GitTree;
+use crate::utils::read_lines;
+
 struct FileWriter(File);
 
 impl Handler for FileWriter {
@@ -18,12 +24,6 @@ impl Handler for FileWriter {
         Ok(data.len())
     }
 }
-
-use crate::Config;
-use crate::curl_helper::BodyExt;
-use crate::entities::game::{Game, ModDownloadEntry};
-use crate::entities::github::GitTree;
-use crate::utils::read_lines;
 
 struct ModPathInfo {
     title_name: String,
