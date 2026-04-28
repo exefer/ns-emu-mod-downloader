@@ -17,6 +17,6 @@ Mods are downloaded from:
 - [StevensND/switch-port-mods](https://github.com/StevensND/switch-port-mods)
 - [StevensND/ue4-emuswitch-60fps](https://github.com/StevensND/ue4-emuswitch-60fps)
 - [Kenji-NX/switch-pchtxt-mods](https://github.com/Kenji-NX/switch-pchtxt-mods)
-- [Fl4sh9174/Switch-Ultrawide-Mods](https://github.com/Fl4sh9174/Switch-Ultrawide-Mods)
+- [Fl4sh9174/Switch-Emulator-Ultrawide-FPS-Mods](https://github.com/Fl4sh9174/Switch-Emulator-Ultrawide-FPS-Mods)
 
 Thanks to these projects and their creators for making such amazing repositories!
