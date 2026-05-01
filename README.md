@@ -6,6 +6,8 @@ Ryujinx and derivatives are not supported.
 
 I'm still learning Rust, so expect code improvements over time.
 
+If you are looking for cheats, check out [ns-emu-cheats-downloader](https://github.com/exefer/ns-emu-cheats-downloader) instead.
+
 ## Troubleshooting
 
 If you are having trouble downloading mods for a specific game version you have installed, and you are certain that mods for that version are available, try toggling the "Scan Subfolders" option on and off in your game directories on your emulator, then re-run the tool.
