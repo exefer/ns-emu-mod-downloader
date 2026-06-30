@@ -100,7 +100,7 @@ const REPOS: &[&str] = &[
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("=== Mod Downloader ===");
+    println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
     let config = build_config()?;
 
